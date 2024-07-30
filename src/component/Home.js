@@ -1,190 +1,213 @@
 import React, { useRef, useEffect, useState } from "react";
 
+
+const UNIT_SIZE = 20
+
+class Snake {
+  constructor(initialPosition) {
+    this.segments = initialPosition;
+    this.xVelocity = UNIT_SIZE;
+    this.yVelocity = 0;
+  }
+
+  move() {
+    const head = {
+      x: this.segments[0].x + this.xVelocity,
+      y: this.segments[0].y + this.yVelocity,
+    };
+    this.segments.unshift(head);
+    return head;
+  }
+
+  grow() {
+    // Do nothing; the snake grows automatically by not popping the tail
+  }
+
+  shrink() {
+    this.segments.pop();
+  }
+
+  changeDirection(newXVelocity, newYVelocity) {
+    if (newXVelocity !== -this.xVelocity || newYVelocity !== -this.yVelocity) {
+      this.xVelocity = newXVelocity;
+      this.yVelocity = newYVelocity;
+    }
+  }
+
+  draw(ctx, snakeColor, snakeBorder) {
+    ctx.fillStyle = snakeColor;
+    ctx.strokeStyle = snakeBorder;
+    this.segments.forEach((sPart) => {
+      ctx.fillRect(sPart.x, sPart.y, UNIT_SIZE, UNIT_SIZE);
+      ctx.strokeRect(sPart.x, sPart.y, UNIT_SIZE, UNIT_SIZE);
+    });
+  }
+}
+
+
+class Food {
+
+  constructor(gameWidth, gameHeight) {
+    this.gameWidth = gameWidth;
+    this.gameHeight = gameHeight;
+    this.x = 0;
+    this.y = 0;
+    this.generatePosition();
+  }
+
+  generatePosition() {
+    this.x = Math.floor(Math.random() * (this.gameWidth / UNIT_SIZE)) * UNIT_SIZE;
+    this.y = Math.floor(Math.random() * (this.gameHeight / UNIT_SIZE)) * UNIT_SIZE;
+  }
+
+  draw(ctx) {
+    ctx.fillStyle = "red";
+    ctx.fillRect(this.x, this.y, UNIT_SIZE, UNIT_SIZE );
+  }
+}
+
+
 const Home = () => {
   const gameboardRef = useRef(null);
-  const unitSize = 20;
+  const frameDelay = 200; // Delay in milliseconds
 
   const [ctx, setCtx] = useState(null);
   const [score, setScore] = useState(0);
   const [running, setRunning] = useState(false);
-  const [xVelocity, setXVelocity] = useState(unitSize);
-  const [yVelocity, setYVelocity] = useState(0);
-  const [gameWidth, setGameWidth] = useState(0)
-  const [gameHeight, setGameHeight] = useState(0)
-  const [foodX, setFoodX] = useState(0)
-  const [foodY, setFoodY] = useState(0)
+  const [gameWidth, setGameWidth] = useState(0);
+  const [gameHeight, setGameHeight] = useState(0);
+
+  const [snake, setSnake] = useState(
+    new Snake([
+      { x: UNIT_SIZE * 3, y: 0 },
+      { x: UNIT_SIZE * 4, y: 0 },
+      { x: UNIT_SIZE * 2, y: 0 },
+      { x: UNIT_SIZE, y: 0 },
+      { x: 0, y: 0 },
+    ])
+  );
+
+  const [food, setFood] = useState(new Food(gameWidth, gameHeight));
+
+
   const boardBackground = "white";
   const snakeColor = "lightgreen";
   const snakeBorder = "black";
-  // const foodColor = "red";
-  const [snake, setSnake] = useState([
-    { x: unitSize * 3, y: 0 },
-    { x: unitSize * 4, y: 0 },
-    { x: unitSize * 2, y: 0 },
-    { x: unitSize, y: 0 },
-    { x: 0, y: 0 },
-  ]);
 
   const clearBoard = () => {
     ctx.fillStyle = boardBackground;
-    ctx.fillRect(0, 0, gameWidth, gameHeight)
-  }
-
-  const getRandomNum = (min, max) => {
-    const randomNum = Math.random()
-    const roundNum = Math.round((randomNum * (max - min) + min) / unitSize)
-    return roundNum * unitSize
-  }
-
-  const drawFood = (context) => {
-    context.fillStyle = "red";
-    context.fillRect(foodX, foodY, unitSize, unitSize / 2);
-  }
-
-  const createFood = () => {
-    const fX = getRandomNum(0, gameboardRef.current.width - unitSize)
-    const fY = getRandomNum(0, gameboardRef.current.height - unitSize)
-    setFoodX(fX);
-    setFoodY(fY);
-  }
-
-  const drawSnake = () => {
-    ctx.fillStyle = snakeColor;
-    ctx.strokeStyle = snakeBorder;
-    // ctx.fillRect(10, 15, 30, 50);
-    snake.forEach(sPart => {
-      ctx.fillRect(sPart.x, sPart.y, unitSize, unitSize / 2)
-      ctx.strokeRect(sPart.x, sPart.y, unitSize, unitSize / 2)
-    })
-
-  }
+    ctx.fillRect(0, 0, gameWidth, gameHeight);
+  };
 
   const moveSnake = () => {
-    const head = {
-      x: snake[0].x + xVelocity,
-      y: snake[0].y + yVelocity
-    }
-    
+    const head = snake.move();
 
-    const snk = snake
-    console.log("move ", xVelocity, yVelocity)
-    snk.unshift(head)
-    setSnake(snk)
-    // console.log("move ", snk)
-
-    if (snake[0].x == foodX && snake[0].y == foodY) {
-      score++
-      createFood()
+    if (head.x === food.x && head.y === food.y) {
+      setScore(score + 1);
+      food.generatePosition();
+      setFood({ ...food });
     } else {
-      snk.pop();
-      setSnake(snk)
+      snake.shrink();
     }
 
-    // console.log("move ", snake)
-  }
+    setSnake({ ...snake });
+  };
 
-  
+  const gameLoop = () => {
+    if (!running) return;
 
-  const nextTick = () => {
-    if (running) {
-      setTimeout(() => {
-        clearBoard()
-        drawFood(ctx)
-        moveSnake()
-        drawSnake()
-        checkGameOver()
-        nextTick()
-      }, 1000)
-    }
-  }
-
-  useEffect(() => {
-    if (!gameboardRef.current) return
-    const width = gameboardRef.current.width
-    const height = gameboardRef.current.height
-    const context = gameboardRef.current.getContext("2d");
-    
-    setCtx(context);
-    // setRunning(true)
-    context.beginPath()
-    context.clearRect(0, 0, width, height);
-
-    setGameHeight(height)
-    setGameWidth(width)
-
-    startGame(context)
-
-
-    window.addEventListener('keydown', changeSnakeDirection)
-
-    return () => {
-      window.removeEventListener("keydown", changeSnakeDirection);
-    }
-
-    // nextTick();
-  }, [running])
-
+    clearBoard();
+    food.draw(ctx);
+    moveSnake();
+    snake.draw(ctx, snakeColor, snakeBorder);
+    checkGameOver();
+    setTimeout(() => {
+      requestAnimationFrame(gameLoop);
+    }, frameDelay);
+  };
 
   const resetGame = () => {
-    // setRunning(false);
-    setXVelocity(unitSize)
-    setYVelocity(0)
+    setRunning(false);
+    setSnake(
+      new Snake(UNIT_SIZE, [
+        { x: UNIT_SIZE * 3, y: 0 },
+        { x: UNIT_SIZE * 4, y: 0 },
+        { x: UNIT_SIZE * 2, y: 0 },
+        { x: UNIT_SIZE, y: 0 },
+        { x: 0, y: 0 },
+      ])
+    );
+    setScore(0);
+    food.generatePosition();
+    setFood({ ...food });
+    setRunning(true);
+    requestAnimationFrame(gameLoop);
   };
 
   const changeSnakeDirection = (event) => {
-    // console.log(event)
-    const keydown = event.key;
+    const key = event.key;
 
-    const goingUp = (yVelocity === -unitSize)
-    const goingDown = (yVelocity === unitSize)
-    const goingRight = (xVelocity === unitSize)
-    const goingLeft = (xVelocity === -unitSize)
-
-    switch (true) {
-      case (keydown == "a" && !goingRight):
-        console.log(keydown === "a" && !goingRight)
-        setXVelocity(-unitSize)
-        setYVelocity(0)
+    switch (key) {
+      case "ArrowLeft":
+        snake.changeDirection(-UNIT_SIZE, 0);
         break;
-      case (keydown === "w" && !goingDown):
-        setXVelocity(0)
-        setYVelocity(-unitSize)
-        break
-      case (keydown === "d" && !goingLeft):
-        setXVelocity(unitSize)
-        setYVelocity(0)
+      case "ArrowRight":
+        snake.changeDirection(UNIT_SIZE, 0);
         break;
-      
-      case (keydown === "s" && !goingUp):
-        console.log("Is a pressed", snake)
-        setXVelocity(0)
-        setYVelocity(unitSize)
+      case "ArrowUp":
+        snake.changeDirection(0, -UNIT_SIZE);
         break;
-
+      case "ArrowDown":
+        snake.changeDirection(0, UNIT_SIZE);
+        break;
+      default:
+        break;
     }
-  }
-
-  const startGame = (context) => { 
-    setRunning(true)
-    createFood()
-    drawFood(context)
-    nextTick()
-  }
+  };
 
   const checkGameOver = () => {
+    // Implement game over logic
+  };
 
-  }
+  useEffect(() => {
+    const canvas = gameboardRef.current;
+    const context = canvas.getContext("2d");
+
+    setCtx(context);
+    setGameWidth(canvas.width);
+    setGameHeight(canvas.height);
+
+    const initialFood = new Food(canvas.width, canvas.height);
+    initialFood.generatePosition();
+    setFood(initialFood);
+    setRunning(true);
+    window.addEventListener("keydown", changeSnakeDirection);
+
+    return () => {
+      window.removeEventListener("keydown", changeSnakeDirection);
+    };
+  }, []); // Empty dependency array to run only once on mount
+
+  useEffect(() => {
+    if (running) {
+      gameLoop();
+    }
+  }, [running]); // Run gameLoop whenever running state changes
 
   return (
-    <div className="game-container" >
-      <canvas ref={gameboardRef} className="game-board w-96 h-96 border-4 "></canvas>
-      <div className="score text-8xl">0</div>
-      <button
-        className="resetBtn w-28 h-14 border-4 border-solid"
-        onClick={resetGame}
-      >Reset</button>
+    <div className="game-container">
+      <canvas
+        ref={gameboardRef}
+        className="game-board w-96 h-96 border-4"
+        width="480"
+        height="480"
+      ></canvas>
+      <div className="score text-8xl">{score}</div>
+      <button className="resetBtn w-28 h-14 border-4 border-solid" onClick={resetGame}>
+        Reset
+      </button>
     </div>
-  )
-}
+  );
+};
 
-export default Home;  
+export default Home;
